@@ -1,0 +1,18 @@
+# Server configuration
+[server]
+grpc-port = "5055"
+
+# Bitcoin configuration
+[bitcoin]
+network = "testnet3"
+host = "103.154.187.179:18332"
+user = "user"
+pass = "123@abcD"
+query-interval = 60
+
+# EVM configuration
+[evm]
+url = "http://localhost:8545"
+chain-id = 1
+query-interval = 30
+private-key = "883d80012adf2272875981428715c56558eb388dcea4b48e030bd63ddd23c128"
