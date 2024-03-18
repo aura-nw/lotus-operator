@@ -16,3 +16,7 @@ url = "http://localhost:8545"
 chain-id = 1
 query-interval = 30
 private-key = "883d80012adf2272875981428715c56558eb388dcea4b48e030bd63ddd23c128"
+
+[contracts]
+wrapped-btc-addr = ""
+gateway-addr = ""

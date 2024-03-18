@@ -26,11 +26,17 @@ type BitcoinInfo struct {
 }
 
 type EvmInfo struct {
-	Url              string `toml:"url"`
-	ChainID          int64  `toml:"chain-id"`
-	QueryInterval    int64  `toml:"query-interval"`
-	MinConfirmations int64  `toml:"min-confirmations"`
-	PrivateKey       string `toml:"private-key"`
+	Url              string      `toml:"url"`
+	ChainID          int64       `toml:"chain-id"`
+	QueryInterval    int64       `toml:"query-interval"`
+	MinConfirmations int64       `toml:"min-confirmations"`
+	PrivateKey       string      `toml:"private-key"`
+	Contracts        EvmContract `toml:"contracts"`
+}
+
+type EvmContract struct {
+	WrappedBtcAddr string `toml:"wrapped-btc-addr"`
+	GatewayAddr    string `toml:"gateway-addr"`
 }
 
 // LoadConfig loads config from toml file to OperatorConfig
