@@ -14,9 +14,9 @@ query-interval = 60
 [evm]
 url = "http://localhost:8545"
 chain-id = 1
-query-interval = 30
+query-interval = 5
 private-key = "883d80012adf2272875981428715c56558eb388dcea4b48e030bd63ddd23c128"
 
 [contracts]
-wrapped-btc-addr = ""
-gateway-addr = ""
+wrapped-btc-addr = "0xC70b52bBFd514859FA01728FcE22DABb96cc130D"
+gateway-addr = "0x4F80aD4F4F398465EaED7b5a6Cb5f2Fe256f7239"
