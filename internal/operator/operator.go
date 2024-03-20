@@ -5,8 +5,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/aura-nw/btc-bridge-core/clients/evm/contracts"
+	"github.com/aura-nw/btc-bridge-core/clients/evm/txmgr"
 	"github.com/aura-nw/btc-bridge-operator/config"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 type Operator struct {
@@ -18,6 +19,8 @@ type Operator struct {
 
 	evmVerifier EvmVerifier
 	evmSender   EvmSender
+
+	btcVerifier BtcVerifier
 }
 
 func NewOperator(ctx context.Context, config *config.Config, logger *slog.Logger) (*Operator, error) {
@@ -68,12 +71,44 @@ func (op *Operator) incomingEventsLoop() {
 				op.logger.Error("incomingEventsLoop: get incoming invoice failed", "id", lastId+1, "err", err)
 				continue
 			}
-			if IsInAddresses(invoice.Verifieds, op.evmSender.GetAddress()) {
+
+			if InvoiceStatus(invoice.Status) != Pending {
+				op.logger.Info("incomingEventsLoop: incoming invoice no need verify", "id", lastId+1, "err", err)
+				lastId++
+				continue
+			}
+
+			if op.isVerified(invoice) {
 				op.logger.Info("incomingEventsLoop: operator has verified", "address", op.evmSender.GetAddress().Hex())
 				lastId++
 				continue
 			}
 
+			// Verify invoice
+			verified, err := op.btcVerifier.VerifyBtcDeposit("", invoice.Utxo)
+			if err != nil {
+				op.logger.Error("incomingEventsLoop: verify btc deposit failed", "err", err)
+				continue
+			}
+			if !verified {
+				op.logger.Info("incomingEventsLoop: btc deposit not vaild", "id", invoice.InvoiceId)
+				// Vote no
+				receipt, err := op.evmSender.SendAndWait(txmgr.TxCandidate{})
+				if err != nil {
+					op.logger.Error("incomingEventsLoop: send vote no failed", "err", err)
+					continue
+				}
+				op.logger.Info("incomingEventsLoop: send vote successed", "receipt", receipt.TxHash.String())
+				lastId++
+				continue
+			}
+			// Vote yes
+			receipt, err := op.evmSender.SendAndWait(txmgr.TxCandidate{})
+			if err != nil {
+				op.logger.Error("incomingEventsLoop: send vote yes failed", "err", err)
+				continue
+			}
+			op.logger.Info("incomingEventsLoop: send vote successed", "receipt", receipt.TxHash.String())
 			lastId++
 		}
 
@@ -87,11 +122,19 @@ func (op *Operator) Stop() {
 	op.cancel()
 }
 
-func IsInAddresses(addresses []common.Address, target common.Address) bool {
-	for _, addr := range addresses {
-		if target.Cmp(addr) == 0 {
-			return true
+func (op *Operator) isVerified(invoice *contracts.IGatewayIncomingInvoiceResponse) bool {
+	myIndex := op.indexOnIncommingInvoice(invoice)
+	if myIndex == -1 || myIndex >= len(invoice.Confirmations) {
+		return false
+	}
+	return invoice.Confirmations[myIndex]
+}
+
+func (op *Operator) indexOnIncommingInvoice(invoice *contracts.IGatewayIncomingInvoiceResponse) int {
+	for index, address := range invoice.Validators {
+		if op.evmSender.GetAddress() == address {
+			return index
 		}
 	}
-	return false
+	return -1
 }

@@ -25,3 +25,15 @@ type EvmSender interface {
 	GetAddress() common.Address
 	SendAndWait(tx txmgr.TxCandidate) (*types.Receipt, error)
 }
+
+type InvoiceStatus uint8
+
+const (
+	Waiting InvoiceStatus = iota
+	Pending
+	Minted
+	Refunding
+	Refunded
+	Manual
+	Paid
+)

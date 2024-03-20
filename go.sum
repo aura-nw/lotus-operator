@@ -11,6 +11,8 @@ github.com/allegro/bigcache v1.2.1 h1:hg1sY1raCwic3Vnsvje6TT7/pnZba83LeFck5NrFKS
 github.com/allegro/bigcache v1.2.1/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
 github.com/aura-nw/btc-bridge-core v0.0.0-20240318153707-0a9c8367f793 h1:th7Hdd1KihjL/vsjkwsG+TRXeO0jzuvXQD+hJvmnU/A=
 github.com/aura-nw/btc-bridge-core v0.0.0-20240318153707-0a9c8367f793/go.mod h1:xSjL6la5LRn4UymlVy6Pj9Y4F/xcSYT8EYgSHVqBsY4=
+github.com/aura-nw/btc-bridge-core v0.0.0-20240320090311-8cc7078d178d h1:Ln3k0a1IvDbqiQ3naIzWglkAitncKeMeVDKPe07puxM=
+github.com/aura-nw/btc-bridge-core v0.0.0-20240320090311-8cc7078d178d/go.mod h1:xSjL6la5LRn4UymlVy6Pj9Y4F/xcSYT8EYgSHVqBsY4=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.10.0 h1:ePXTeiPEazB5+opbv5fr8umg2R/1NlzgDsyepwsSr88=

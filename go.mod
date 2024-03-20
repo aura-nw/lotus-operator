@@ -4,7 +4,7 @@ go 1.22.1
 
 require (
 	github.com/BurntSushi/toml v1.3.2
-	github.com/aura-nw/btc-bridge-core v0.0.0-20240318153707-0a9c8367f793
+	github.com/aura-nw/btc-bridge-core v0.0.0-20240320090311-8cc7078d178d
 	github.com/ethereum/go-ethereum v1.13.14
 	github.com/stretchr/testify v1.9.0
 )
