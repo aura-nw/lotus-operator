@@ -1,15 +1,16 @@
-package operator
+package evm
 
 import (
 	"math/big"
 
 	"github.com/aura-nw/btc-bridge-core/clients/evm/contracts"
-	"github.com/aura-nw/btc-bridge-core/clients/evm/txmgr"
+	"github.com/ethereum-optimism/optimism/op-service/sources/batching"
+	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-type EvmVerifier interface {
+type Verifier interface {
 	VerifyIncomingInvoice(id uint64, utxo string, amount *big.Int, recipient common.Address) (bool, error)
 	GetLastIdVerifyIncomingInvoice(operator common.Address) (uint64, error)
 	GetIncomingInvoiceCount() (uint64, error)
@@ -21,9 +22,9 @@ type EvmVerifier interface {
 	GetOutgoingInvoice(id uint64) (*contracts.IGatewayOutgoingInvoiceResponse, error)
 }
 
-type EvmSender interface {
+type Sender interface {
 	GetAddress() common.Address
-	SendAndWait(tx txmgr.TxCandidate) (*types.Receipt, error)
+	SendAndWait(txs ...txmgr.TxCandidate) (*types.Receipt, error)
 }
 
 type InvoiceStatus uint8
@@ -37,3 +38,7 @@ const (
 	Manual
 	Paid
 )
+
+type ContractOptions struct {
+	GatewayContract *batching.BoundContract
+}

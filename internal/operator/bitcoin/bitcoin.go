@@ -1,4 +1,4 @@
-package operator
+package bitcoin
 
 type BtcVerifier interface {
 	VerifyBtcDeposit(txHash string, utxo string) (bool, error)

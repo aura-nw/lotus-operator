@@ -6,8 +6,13 @@ import (
 	"time"
 
 	"github.com/aura-nw/btc-bridge-core/clients/evm/contracts"
-	"github.com/aura-nw/btc-bridge-core/clients/evm/txmgr"
 	"github.com/aura-nw/btc-bridge-operator/config"
+	"github.com/aura-nw/btc-bridge-operator/internal/operator/bitcoin"
+	"github.com/aura-nw/btc-bridge-operator/internal/operator/evm"
+)
+
+const (
+	verifyIncomingInvoiceMethod = "verifyIncomingInvoice"
 )
 
 type Operator struct {
@@ -17,10 +22,11 @@ type Operator struct {
 	logger *slog.Logger
 	config *config.Config
 
-	evmVerifier EvmVerifier
-	evmSender   EvmSender
+	evmVerifier evm.Verifier
+	evmSender   evm.Sender
+	contracts   *evm.ContractOptions
 
-	btcVerifier BtcVerifier
+	btcVerifier bitcoin.BtcVerifier
 }
 
 func NewOperator(ctx context.Context, config *config.Config, logger *slog.Logger) (*Operator, error) {
@@ -31,15 +37,26 @@ func NewOperator(ctx context.Context, config *config.Config, logger *slog.Logger
 		config: config,
 		logger: logger,
 	}
+
+	if err := op.init(); err != nil {
+		return nil, err
+	}
+
 	return op, nil
 }
 
+func (op *Operator) init() error {
+	return nil
+}
+
 func (op *Operator) Start() {
+	op.logger.Info("starting operator service")
 	go op.incomingEventsLoop()
 	go op.outgoingEventsLoop()
 }
 
 func (op *Operator) incomingEventsLoop() {
+	op.logger.Info("starting incoming events loop")
 	lastId, err := op.evmVerifier.GetLastIdVerifyIncomingInvoice(op.evmSender.GetAddress())
 	if err != nil {
 		op.logger.Error("incomingEventsLoop: get last id failed", "err", err)
@@ -72,7 +89,7 @@ func (op *Operator) incomingEventsLoop() {
 				continue
 			}
 
-			if InvoiceStatus(invoice.Status) != Pending {
+			if evm.InvoiceStatus(invoice.Status) != evm.Pending {
 				op.logger.Info("incomingEventsLoop: incoming invoice no need verify", "id", lastId+1, "err", err)
 				lastId++
 				continue
@@ -93,7 +110,18 @@ func (op *Operator) incomingEventsLoop() {
 			if !verified {
 				op.logger.Info("incomingEventsLoop: btc deposit not vaild", "id", invoice.InvoiceId)
 				// Vote no
-				receipt, err := op.evmSender.SendAndWait(txmgr.TxCandidate{})
+				tx, err := op.contracts.GatewayContract.Call(verifyIncomingInvoiceMethod,
+					invoice.InvoiceId,
+					invoice.Utxo,
+					invoice.Amount,
+					invoice.Recipient,
+					false,
+				).ToTxCandidate()
+				if err != nil {
+					op.logger.Error("contract call to tx candidate error", "err", err)
+					continue
+				}
+				receipt, err := op.evmSender.SendAndWait(tx)
 				if err != nil {
 					op.logger.Error("incomingEventsLoop: send vote no failed", "err", err)
 					continue
@@ -103,7 +131,18 @@ func (op *Operator) incomingEventsLoop() {
 				continue
 			}
 			// Vote yes
-			receipt, err := op.evmSender.SendAndWait(txmgr.TxCandidate{})
+			tx, err := op.contracts.GatewayContract.Call(verifyIncomingInvoiceMethod,
+				invoice.InvoiceId,
+				invoice.Utxo,
+				invoice.Amount,
+				invoice.Recipient,
+				true,
+			).ToTxCandidate()
+			if err != nil {
+				op.logger.Error("contract call to tx candidate error", "err", err)
+				continue
+			}
+			receipt, err := op.evmSender.SendAndWait(tx)
 			if err != nil {
 				op.logger.Error("incomingEventsLoop: send vote yes failed", "err", err)
 				continue
@@ -116,9 +155,11 @@ func (op *Operator) incomingEventsLoop() {
 }
 
 func (op *Operator) outgoingEventsLoop() {
+	op.logger.Info("starting outgoing events loop")
 }
 
 func (op *Operator) Stop() {
+	op.logger.Info("stopping operator service")
 	op.cancel()
 }
 
