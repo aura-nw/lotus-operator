@@ -32,6 +32,7 @@ type EvmInfo struct {
 	MinConfirmations int64       `toml:"min-confirmations"`
 	PrivateKey       string      `toml:"private-key"`
 	Contracts        EvmContract `toml:"contracts"`
+	CallTimeout      uint64      `toml:"call-timeout"`
 }
 
 type EvmContract struct {

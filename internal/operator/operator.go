@@ -11,10 +11,6 @@ import (
 	"github.com/aura-nw/btc-bridge-operator/internal/operator/evm"
 )
 
-const (
-	verifyIncomingInvoiceMethod = "verifyIncomingInvoice"
-)
-
 type Operator struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -23,9 +19,6 @@ type Operator struct {
 	config *config.Config
 
 	evmVerifier evm.Verifier
-	evmSender   evm.Sender
-	contracts   *evm.ContractOptions
-
 	btcVerifier bitcoin.BtcVerifier
 }
 
@@ -46,6 +39,13 @@ func NewOperator(ctx context.Context, config *config.Config, logger *slog.Logger
 }
 
 func (op *Operator) init() error {
+	// Init evm verifier
+	evmVerifier, err := evm.NewVerifier(op.ctx, op.logger, op.config.Evm)
+	if err != nil {
+		return err
+	}
+	op.evmVerifier = evmVerifier
+
 	return nil
 }
 
@@ -57,12 +57,12 @@ func (op *Operator) Start() {
 
 func (op *Operator) incomingEventsLoop() {
 	op.logger.Info("starting incoming events loop")
-	lastId, err := op.evmVerifier.GetLastIdVerifyIncomingInvoice(op.evmSender.GetAddress())
+	lastId, err := op.evmVerifier.GetLastIdVerifyIncomingInvoice(op.evmVerifier.GetAddress())
 	if err != nil {
 		op.logger.Error("incomingEventsLoop: get last id failed", "err", err)
 		return
 	}
-	op.logger.Info("incomingEventsLoop", "last_id", lastId)
+	op.logger.Info("incomingEventsLoop", "last_id", lastId, "query_interval", op.config.Evm.QueryInterval)
 
 	ticker := time.NewTicker(time.Duration(op.config.Evm.QueryInterval) * time.Second)
 	defer ticker.Stop()
@@ -73,13 +73,15 @@ func (op *Operator) incomingEventsLoop() {
 			op.logger.Info("incomingEventsLoop: context done")
 			return
 		case <-ticker.C:
-			count, err := op.evmVerifier.GetIncomingInvoiceCount()
+			c, err := op.evmVerifier.GetIncomingInvoiceCount()
 			if err != nil {
 				op.logger.Error("incomingEventsLoop: get incoming invoice count failed", "err", err)
 				continue
 			}
-			if lastId == count {
-				op.logger.Info("incomingEventsLoop: waiting for next incoming id", "err", err)
+			lastId := lastId.Uint64()
+			count := c.Uint64()
+			if lastId >= count {
+				op.logger.Info("incomingEventsLoop: waiting for next incoming id", "err", err, "lastId", lastId, "count", count)
 				continue
 			}
 			// Process next id
@@ -96,58 +98,33 @@ func (op *Operator) incomingEventsLoop() {
 			}
 
 			if op.isVerified(invoice) {
-				op.logger.Info("incomingEventsLoop: operator has verified", "address", op.evmSender.GetAddress().Hex())
+				op.logger.Info("incomingEventsLoop: operator has verified", "address", op.evmVerifier.GetAddress().Hex())
 				lastId++
 				continue
 			}
 
 			// Verify invoice
-			verified, err := op.btcVerifier.VerifyBtcDeposit("", invoice.Utxo)
+			valid, err := op.btcVerifier.VerifyBtcDeposit("", invoice.Utxo)
 			if err != nil {
 				op.logger.Error("incomingEventsLoop: verify btc deposit failed", "err", err)
 				continue
 			}
-			if !verified {
+			if !valid {
 				op.logger.Info("incomingEventsLoop: btc deposit not vaild", "id", invoice.InvoiceId)
-				// Vote no
-				tx, err := op.contracts.GatewayContract.Call(verifyIncomingInvoiceMethod,
-					invoice.InvoiceId,
-					invoice.Utxo,
-					invoice.Amount,
-					invoice.Recipient,
-					false,
-				).ToTxCandidate()
-				if err != nil {
-					op.logger.Error("contract call to tx candidate error", "err", err)
+				// Vote no and wait
+				if err := op.evmVerifier.VerifyIncomingInvoice(invoice.InvoiceId.Uint64(), invoice.Utxo, invoice.Amount, invoice.Recipient, false); err != nil {
+					op.logger.Error("verify incomming invoice error", "err", err)
 					continue
 				}
-				receipt, err := op.evmSender.SendAndWait(tx)
-				if err != nil {
-					op.logger.Error("incomingEventsLoop: send vote no failed", "err", err)
-					continue
-				}
-				op.logger.Info("incomingEventsLoop: send vote successed", "receipt", receipt.TxHash.String())
 				lastId++
 				continue
 			}
-			// Vote yes
-			tx, err := op.contracts.GatewayContract.Call(verifyIncomingInvoiceMethod,
-				invoice.InvoiceId,
-				invoice.Utxo,
-				invoice.Amount,
-				invoice.Recipient,
-				true,
-			).ToTxCandidate()
-			if err != nil {
-				op.logger.Error("contract call to tx candidate error", "err", err)
+			// Vote yes and wait
+			op.logger.Info("incomingEventsLoop: btc deposit vaild", "id", invoice.InvoiceId)
+			if err := op.evmVerifier.VerifyIncomingInvoice(invoice.InvoiceId.Uint64(), invoice.Utxo, invoice.Amount, invoice.Recipient, true); err != nil {
+				op.logger.Error("verify incomming invoice error", "err", err)
 				continue
 			}
-			receipt, err := op.evmSender.SendAndWait(tx)
-			if err != nil {
-				op.logger.Error("incomingEventsLoop: send vote yes failed", "err", err)
-				continue
-			}
-			op.logger.Info("incomingEventsLoop: send vote successed", "receipt", receipt.TxHash.String())
 			lastId++
 		}
 
@@ -163,7 +140,7 @@ func (op *Operator) Stop() {
 	op.cancel()
 }
 
-func (op *Operator) isVerified(invoice *contracts.IGatewayIncomingInvoiceResponse) bool {
+func (op *Operator) isVerified(invoice contracts.IGatewayIncomingInvoiceResponse) bool {
 	myIndex := op.indexOnIncommingInvoice(invoice)
 	if myIndex == -1 || myIndex >= len(invoice.Confirmations) {
 		return false
@@ -171,9 +148,9 @@ func (op *Operator) isVerified(invoice *contracts.IGatewayIncomingInvoiceRespons
 	return invoice.Confirmations[myIndex]
 }
 
-func (op *Operator) indexOnIncommingInvoice(invoice *contracts.IGatewayIncomingInvoiceResponse) int {
+func (op *Operator) indexOnIncommingInvoice(invoice contracts.IGatewayIncomingInvoiceResponse) int {
 	for index, address := range invoice.Validators {
-		if op.evmSender.GetAddress() == address {
+		if op.evmVerifier.GetAddress() == address {
 			return index
 		}
 	}
