@@ -19,7 +19,7 @@ type Operator struct {
 	config *config.Config
 
 	evmVerifier evm.Verifier
-	btcVerifier bitcoin.BtcVerifier
+	btcVerifier bitcoin.Verifier
 }
 
 func NewOperator(ctx context.Context, config *config.Config, logger *slog.Logger) (*Operator, error) {
@@ -57,12 +57,12 @@ func (op *Operator) Start() {
 
 func (op *Operator) incomingEventsLoop() {
 	op.logger.Info("starting incoming events loop")
-	lastId, err := op.evmVerifier.GetLastIdVerifyIncomingInvoice(op.evmVerifier.GetAddress())
+	nextId, err := op.evmVerifier.GetNextIdVerifyIncomingInvoice(op.evmVerifier.GetAddress())
 	if err != nil {
 		op.logger.Error("incomingEventsLoop: get last id failed", "err", err)
 		return
 	}
-	op.logger.Info("incomingEventsLoop", "last_id", lastId, "query_interval", op.config.Evm.QueryInterval)
+	op.logger.Info("incomingEventsLoop", "next_id", nextId, "query_interval", op.config.Evm.QueryInterval)
 
 	ticker := time.NewTicker(time.Duration(op.config.Evm.QueryInterval) * time.Second)
 	defer ticker.Stop()
@@ -78,33 +78,33 @@ func (op *Operator) incomingEventsLoop() {
 				op.logger.Error("incomingEventsLoop: get incoming invoice count failed", "err", err)
 				continue
 			}
-			lastId := lastId.Uint64()
+			id := nextId.Uint64()
 			count := c.Uint64()
-			if lastId >= count {
-				op.logger.Info("incomingEventsLoop: waiting for next incoming id", "err", err, "lastId", lastId, "count", count)
+			if id > count {
+				op.logger.Info("incomingEventsLoop: waiting for next incoming id", "err", err, "next_id", id, "count", count)
 				continue
 			}
 			// Process next id
-			invoice, err := op.evmVerifier.GetIncomingInvoice(lastId + 1)
+			invoice, err := op.evmVerifier.GetIncomingInvoice(id)
 			if err != nil {
-				op.logger.Error("incomingEventsLoop: get incoming invoice failed", "id", lastId+1, "err", err)
+				op.logger.Error("incomingEventsLoop: get incoming invoice failed", "id", id, "err", err)
 				continue
 			}
 
 			if evm.InvoiceStatus(invoice.Status) != evm.Pending {
-				op.logger.Info("incomingEventsLoop: incoming invoice no need verify", "id", lastId+1, "err", err)
-				lastId++
+				op.logger.Info("incomingEventsLoop: incoming invoice no need verify", "id", id, "err", err)
+				id++
 				continue
 			}
 
 			if op.isVerified(invoice) {
 				op.logger.Info("incomingEventsLoop: operator has verified", "address", op.evmVerifier.GetAddress().Hex())
-				lastId++
+				id++
 				continue
 			}
 
 			// Verify invoice
-			valid, err := op.btcVerifier.VerifyBtcDeposit("", invoice.Utxo)
+			valid, err := op.btcVerifier.VerifyBtcDeposit(invoice.Utxo, invoice.Amount.Uint64(), invoice.Recipient.Hex())
 			if err != nil {
 				op.logger.Error("incomingEventsLoop: verify btc deposit failed", "err", err)
 				continue
@@ -116,7 +116,7 @@ func (op *Operator) incomingEventsLoop() {
 					op.logger.Error("verify incomming invoice error", "err", err)
 					continue
 				}
-				lastId++
+				id++
 				continue
 			}
 			// Vote yes and wait
@@ -125,7 +125,7 @@ func (op *Operator) incomingEventsLoop() {
 				op.logger.Error("verify incomming invoice error", "err", err)
 				continue
 			}
-			lastId++
+			id++
 		}
 
 	}

@@ -9,6 +9,7 @@ host = "103.154.187.179:18332"
 user = "user"
 pass = "123@abcD"
 query-interval = 60
+multisig-address = ""
 
 # EVM configuration
 [evm]

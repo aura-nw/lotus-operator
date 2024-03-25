@@ -30,12 +30,12 @@ type Sender interface {
 
 type Reader interface {
 	// Incoming invoice
-	GetLastIdVerifyIncomingInvoice(operator common.Address) (*big.Int, error)
+	GetNextIdVerifyIncomingInvoice(operator common.Address) (*big.Int, error)
 	GetIncomingInvoiceCount() (*big.Int, error)
 	GetIncomingInvoice(id uint64) (contracts.IGatewayIncomingInvoiceResponse, error)
 
 	// Outgoing invoice
-	GetLastIdVerifyOutgoingInvoice(operator common.Address) (*big.Int, error)
+	GetNextIdVerifyOutgoingInvoice(operator common.Address) (*big.Int, error)
 	GetOutgoingInvoiceCount() (*big.Int, error)
 	GetOutgoingInvoice(id uint64) (contracts.IGatewayOutgoingInvoiceResponse, error)
 }
@@ -109,14 +109,22 @@ func (v *verifierImpl) GetIncomingInvoiceCount() (*big.Int, error) {
 	return v.gatewayContract.IncomingInvoicesCount(&bind.CallOpts{})
 }
 
-// GetLastIdVerifyIncomingInvoice implements Verifier.
-func (v *verifierImpl) GetLastIdVerifyIncomingInvoice(operator common.Address) (*big.Int, error) {
-	panic("unimplemented")
+// GetNextIdVerifyIncomingInvoice implements Verifier.
+func (v *verifierImpl) GetNextIdVerifyIncomingInvoice(operator common.Address) (*big.Int, error) {
+	validatorInfo, err := v.gatewayContract.Validator(&bind.CallOpts{}, v.GetAddress())
+	if err != nil {
+		return nil, err
+	}
+	return validatorInfo.NextIncomingInvoice, nil
 }
 
-// GetLastIdVerifyOutgoingInvoice implements Verifier.
-func (v *verifierImpl) GetLastIdVerifyOutgoingInvoice(operator common.Address) (*big.Int, error) {
-	panic("unimplemented")
+// GetNextIdVerifyOutgoingInvoice implements Verifier.
+func (v *verifierImpl) GetNextIdVerifyOutgoingInvoice(operator common.Address) (*big.Int, error) {
+	validatorInfo, err := v.gatewayContract.Validator(&bind.CallOpts{}, v.GetAddress())
+	if err != nil {
+		return nil, err
+	}
+	return validatorInfo.NextOutgoingInvoice, nil
 }
 
 // GetOutgoingInvoice implements Verifier.
