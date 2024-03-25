@@ -4,7 +4,7 @@ go 1.22.1
 
 require (
 	github.com/BurntSushi/toml v1.3.2
-	github.com/aura-nw/btc-bridge-core v0.0.0-20240320090311-8cc7078d178d
+	github.com/aura-nw/btc-bridge-core v0.0.0-20240322033603-289985bf5353
 	github.com/btcsuite/btcd v0.24.0
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/ethereum/go-ethereum v1.13.14
