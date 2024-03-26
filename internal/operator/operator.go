@@ -46,11 +46,18 @@ func (op *Operator) init() error {
 	}
 	op.evmVerifier = evmVerifier
 
+	// Init bitcoin verifier
+	btcVerifier, err := bitcoin.NewVerifier(op.ctx, op.logger, op.config.Bitcoin)
+	if err != nil {
+		return err
+	}
+	op.btcVerifier = btcVerifier
+
 	return nil
 }
 
 func (op *Operator) Start() {
-	op.logger.Info("starting operator service")
+	op.logger.Info("starting operator service", "evm address", op.evmVerifier.GetAddress().Hex())
 	go op.incomingEventsLoop()
 	go op.outgoingEventsLoop()
 }
@@ -59,10 +66,10 @@ func (op *Operator) incomingEventsLoop() {
 	op.logger.Info("starting incoming events loop")
 	nextId, err := op.evmVerifier.GetNextIdVerifyIncomingInvoice(op.evmVerifier.GetAddress())
 	if err != nil {
-		op.logger.Error("incomingEventsLoop: get last id failed", "err", err)
+		op.logger.Error("incomingEventsLoop: get next id error", "err", err)
 		return
 	}
-	op.logger.Info("incomingEventsLoop", "next_id", nextId, "query_interval", op.config.Evm.QueryInterval)
+	op.logger.Info("incomingEventsLoop", "next_id", nextId.Uint64(), "query_interval", op.config.Evm.QueryInterval)
 
 	ticker := time.NewTicker(time.Duration(op.config.Evm.QueryInterval) * time.Second)
 	defer ticker.Stop()
@@ -75,30 +82,32 @@ func (op *Operator) incomingEventsLoop() {
 		case <-ticker.C:
 			c, err := op.evmVerifier.GetIncomingInvoiceCount()
 			if err != nil {
-				op.logger.Error("incomingEventsLoop: get incoming invoice count failed", "err", err)
+				op.logger.Error("incomingEventsLoop: get incoming invoice count error", "err", err)
 				continue
 			}
 			id := nextId.Uint64()
 			count := c.Uint64()
 			if id > count {
-				op.logger.Info("incomingEventsLoop: waiting for next incoming id", "err", err, "next_id", id, "count", count)
+				op.logger.Info("incomingEventsLoop: waiting for next incoming id", "next_id", id, "count", count)
 				continue
 			}
 			// Process next id
 			invoice, err := op.evmVerifier.GetIncomingInvoice(id)
 			if err != nil {
-				op.logger.Error("incomingEventsLoop: get incoming invoice failed", "id", id, "err", err)
+				op.logger.Error("incomingEventsLoop: get incoming invoice error", "err", err, "id", id, "err", err)
 				continue
 			}
 
+			op.logger.Info("incomingEventsLoop: found invoice", "id", id)
+
 			if evm.InvoiceStatus(invoice.Status) != evm.Pending {
-				op.logger.Info("incomingEventsLoop: incoming invoice no need verify", "id", id, "err", err)
+				op.logger.Info("incomingEventsLoop: incoming invoice no need verify", "id", id, "status", invoice.Status)
 				id++
 				continue
 			}
 
 			if op.isVerified(invoice) {
-				op.logger.Info("incomingEventsLoop: operator has verified", "address", op.evmVerifier.GetAddress().Hex())
+				op.logger.Info("incomingEventsLoop: invoice has self-verified", "address", op.evmVerifier.GetAddress().Hex())
 				id++
 				continue
 			}

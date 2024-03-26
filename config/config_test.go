@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	_, err := config.LoadConfig("../operator.toml")
+	c, err := config.LoadConfig("../operator.toml")
 	require.NoError(t, err)
+	t.Log("config: ", c)
 }
