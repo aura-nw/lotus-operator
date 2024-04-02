@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/aura-nw/btc-bridge-core/clients/evm/contracts"
-	"github.com/aura-nw/btc-bridge-operator/config"
+	"github.com/aura-nw/lotus-operator/config"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

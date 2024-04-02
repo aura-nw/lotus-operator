@@ -3,7 +3,7 @@ package bitcoin_test
 import (
 	"testing"
 
-	"github.com/aura-nw/btc-bridge-operator/internal/operator/bitcoin"
+	"github.com/aura-nw/lotus-operator/internal/operator/bitcoin"
 	"github.com/stretchr/testify/require"
 )
 

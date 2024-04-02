@@ -1,4 +1,4 @@
-module github.com/aura-nw/btc-bridge-operator
+module github.com/aura-nw/lotus-operator
 
 go 1.22.1
 

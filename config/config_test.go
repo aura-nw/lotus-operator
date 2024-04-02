@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/aura-nw/btc-bridge-operator/config"
+	"github.com/aura-nw/lotus-operator/config"
 	"github.com/stretchr/testify/require"
 )
 

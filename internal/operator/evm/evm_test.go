@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/aura-nw/btc-bridge-operator/config"
-	"github.com/aura-nw/btc-bridge-operator/internal/operator/evm"
+	"github.com/aura-nw/lotus-operator/config"
+	"github.com/aura-nw/lotus-operator/internal/operator/evm"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"

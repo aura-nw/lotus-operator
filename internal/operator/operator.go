@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/aura-nw/btc-bridge-core/clients/evm/contracts"
-	"github.com/aura-nw/btc-bridge-operator/config"
-	"github.com/aura-nw/btc-bridge-operator/internal/operator/bitcoin"
-	"github.com/aura-nw/btc-bridge-operator/internal/operator/evm"
+	"github.com/aura-nw/lotus-operator/config"
+	"github.com/aura-nw/lotus-operator/internal/operator/bitcoin"
+	"github.com/aura-nw/lotus-operator/internal/operator/evm"
 )
 
 type Operator struct {

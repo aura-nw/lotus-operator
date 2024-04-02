@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/aura-nw/btc-bridge-operator/config"
-	"github.com/aura-nw/btc-bridge-operator/internal/operator"
+	"github.com/aura-nw/lotus-operator/config"
+	"github.com/aura-nw/lotus-operator/internal/operator"
 )
 
 const (
