@@ -47,6 +47,7 @@ func (op *Operator) init() error {
 	// Init evm verifier
 	evmVerifier, err := evm.NewVerifier(op.ctx, op.logger, op.config.Evm)
 	if err != nil {
+		op.logger.Error("init evm verifier failed", "err", err)
 		return err
 	}
 	op.evmVerifier = evmVerifier
@@ -54,6 +55,7 @@ func (op *Operator) init() error {
 	// Init bitcoin verifier
 	btcVerifier, err := bitcoin.NewVerifier(op.ctx, op.logger, op.config.Bitcoin)
 	if err != nil {
+		op.logger.Error("init bitcoin verifier failed", "err", err)
 		return err
 	}
 	op.btcVerifier = btcVerifier
