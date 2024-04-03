@@ -10,15 +10,17 @@ user = "user"
 pass = "123@abcD"
 query-interval = 60
 multisig-address = "tb1qw68npyr7xjr7k7622vnvkus0awjusz4rx2yz2v"
+min-confirmations = 2
 
 # EVM configuration
 [evm]
-url = "https://evmos-testnet-jsonrpc.alkadeta.com"
-chain-id = 9000
-query-interval = 5
+url = "https://jsonrpc.dev.aura.network"
+chain-id = 1235
+query-interval = 6
 private-key = "883d80012adf2272875981428715c56558eb388dcea4b48e030bd63ddd23c128"
 call-timeout = 10
+min-confirmations = 1
 
 [evm.contracts]
-wrapped-btc-addr = "0x7fd84b9a10f13acD07B9fA95D217827dCf608140"
-gateway-addr = "0x6731881DE07Ffce55968a583F5f641C589d25ea7"
+wrapped-btc-addr = "0xC70b52bBFd514859FA01728FcE22DABb96cc130D"
+gateway-addr = "0x4F80aD4F4F398465EaED7b5a6Cb5f2Fe256f7239"
