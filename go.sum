@@ -9,6 +9,8 @@ github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWk
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/aura-nw/btc-bridge-core v0.0.0-20240322033603-289985bf5353 h1:kL68gveTApNO3VRhsBHV7IjBNVL612RdOSxN4xIR66A=
 github.com/aura-nw/btc-bridge-core v0.0.0-20240322033603-289985bf5353/go.mod h1:xSjL6la5LRn4UymlVy6Pj9Y4F/xcSYT8EYgSHVqBsY4=
+github.com/aura-nw/lotus-core v0.0.0-20240402113351-33ae11651316 h1:k3u8J+I+PZJkDFpACxWdCVS8MZkjOzjvo0kAG3lYTI4=
+github.com/aura-nw/lotus-core v0.0.0-20240402113351-33ae11651316/go.mod h1:GzQyrqkkOr02J4R+lztH1lzXLNOZSuukkijj+IaAVOE=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.10.0 h1:ePXTeiPEazB5+opbv5fr8umg2R/1NlzgDsyepwsSr88=

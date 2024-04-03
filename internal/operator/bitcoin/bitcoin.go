@@ -2,7 +2,13 @@ package bitcoin
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"log/slog"
 
 	"github.com/aura-nw/lotus-operator/config"
@@ -16,6 +22,8 @@ type Verifier interface {
 	VerifyBtcDeposit(utxo string, amount uint64, recipient string) (bool, error)
 	VerifyTokenDeposit(utxo string) (bool, error)
 	VerifyInscriptionDeposit(utxo string) (bool, error)
+	Sign(tx *wire.MsgTx) ([]byte, error)
+	ConvertToAddress(pk []byte) (string, error)
 }
 
 type UtxoDef struct {
@@ -47,10 +55,13 @@ func UtxoFromStr(s string) UtxoDef {
 }
 
 type verifierImpl struct {
-	ctx    context.Context
-	logger *slog.Logger
-	info   config.BitcoinInfo
-	client *rpcclient.Client
+	ctx          context.Context
+	logger       *slog.Logger
+	info         config.BitcoinInfo
+	client       *rpcclient.Client
+	redeemScript []byte
+	privateKey   *btcec.PrivateKey
+	chainParam   *chaincfg.Params
 }
 
 // GetMultisigAddr implements Verifier.
@@ -78,6 +89,29 @@ func (v *verifierImpl) VerifyBtcDeposit(utxo string, amount uint64, recipient st
 	return true, nil
 }
 
+// Sign implements Verifier.
+func (v *verifierImpl) Sign(tx *wire.MsgTx) ([]byte, error) {
+	return txscript.SignatureScript(tx, 0, v.redeemScript, txscript.SigHashAll, v.privateKey, true)
+}
+
+// ConvertToAddress implements Verifier.
+func (v *verifierImpl) ConvertToAddress(pkScript []byte) (string, error) {
+	pk, err := txscript.ParsePkScript(pkScript)
+	if err != nil {
+		v.logger.Error("ConvertToAddress: parse pkscript error", "err", err)
+		return "", err
+	}
+
+	btcAddr, err := pk.Address(v.chainParam)
+	if err != nil {
+		v.logger.Error("ConvertToAddress: get address error", "err", err)
+		return "", err
+	}
+
+	return btcAddr.EncodeAddress(), nil
+
+}
+
 // VerifyInscriptionDeposit implements Verifier.
 func (v *verifierImpl) VerifyInscriptionDeposit(utxo string) (bool, error) {
 	panic("unimplemented")
@@ -100,11 +134,29 @@ func NewVerifier(ctx context.Context, logger *slog.Logger, info config.BitcoinIn
 	if err != nil {
 		return nil, err
 	}
+	pk, err := btcutil.DecodeWIF(info.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	redeemScript, err := hex.DecodeString(info.RedeemScript)
+	if err != nil {
+		return nil, err
+	}
+
+	chainParam := &chaincfg.MainNetParams
+	if info.Network == "testnet" {
+		chainParam = &chaincfg.TestNet3Params
+	}
+
 	return &verifierImpl{
-		ctx:    ctx,
-		logger: logger,
-		client: client,
-		info:   info,
+		ctx:          ctx,
+		logger:       logger,
+		client:       client,
+		info:         info,
+		privateKey:   pk.PrivKey,
+		redeemScript: redeemScript,
+		chainParam:   chainParam,
 	}, nil
 }
 

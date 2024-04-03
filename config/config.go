@@ -24,6 +24,8 @@ type BitcoinInfo struct {
 	QueryInterval    int64  `toml:"query-interval"`
 	MinConfirmations int64  `toml:"min-confirmations"`
 	MultisigAddress  string `toml:"multisig-address"`
+	RedeemScript     string `toml:"redeem-script"`
+	PrivateKey       string `toml:"private-key"`
 }
 
 type EvmInfo struct {
