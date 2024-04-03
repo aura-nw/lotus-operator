@@ -1,6 +1,6 @@
 module github.com/aura-nw/lotus-operator
 
-go 1.22.1
+go 1.21.7
 
 require (
 	github.com/BurntSushi/toml v1.3.2

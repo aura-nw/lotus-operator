@@ -11,6 +11,8 @@ pass = "123@abcD"
 query-interval = 60
 multisig-address = "tb1qw68npyr7xjr7k7622vnvkus0awjusz4rx2yz2v"
 min-confirmations = 2
+private-key = ""
+redeem-script = ""
 
 # EVM configuration
 [evm]

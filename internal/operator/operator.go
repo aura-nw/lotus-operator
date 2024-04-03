@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"github.com/aura-nw/lotus-operator/internal/operator/types"
-	"github.com/btcsuite/btcd/wire"
 	"log/slog"
 	"math/big"
 	"time"
@@ -14,6 +12,8 @@ import (
 	"github.com/aura-nw/lotus-operator/config"
 	"github.com/aura-nw/lotus-operator/internal/operator/bitcoin"
 	"github.com/aura-nw/lotus-operator/internal/operator/evm"
+	"github.com/aura-nw/lotus-operator/internal/operator/types"
+	"github.com/btcsuite/btcd/wire"
 )
 
 type Operator struct {
