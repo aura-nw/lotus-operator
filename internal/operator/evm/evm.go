@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/aura-nw/btc-bridge-core/clients/evm/contracts"
+	"github.com/aura-nw/lotus-core/clients/evm/contracts"
 	"github.com/aura-nw/lotus-operator/config"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -38,6 +38,9 @@ type Reader interface {
 	GetNextIdVerifyOutgoingInvoice(operator common.Address) (*big.Int, error)
 	GetOutgoingInvoiceCount() (*big.Int, error)
 	GetOutgoingInvoice(id uint64) (contracts.IGatewayOutgoingInvoiceResponse, error)
+	GetOutgoingTxCount() (*big.Int, error)
+	GetOutgoingTx(id *big.Int) (contracts.IGatewayOutgoingTxInfo, error)
+	VerifyOutgoingTx(id uint64, isVerified bool, signature string) error
 }
 
 type InvoiceStatus uint8
@@ -135,6 +138,36 @@ func (v *verifierImpl) GetOutgoingInvoice(id uint64) (contracts.IGatewayOutgoing
 // GetOutgoingInvoiceCount implements Verifier.
 func (v *verifierImpl) GetOutgoingInvoiceCount() (*big.Int, error) {
 	return v.gatewayContract.OutgoingInvoicesCount(&bind.CallOpts{})
+}
+
+// GetOutgoingTxCount implements Verifier.
+func (v *verifierImpl) GetOutgoingTxCount() (*big.Int, error) {
+	return v.gatewayContract.OutgoingTxCount(&bind.CallOpts{})
+}
+
+// GetOutgoingTx implements Verifier.
+func (v *verifierImpl) GetOutgoingTx(id *big.Int) (contracts.IGatewayOutgoingTxInfo, error) {
+	return v.gatewayContract.OutgoingTx(&bind.CallOpts{}, id)
+
+}
+
+// VerifyOutgoingTx implements Verifier.
+func (v *verifierImpl) VerifyOutgoingTx(id uint64, isVerified bool, signature string) error {
+	tx, err := v.gatewayContract.VerifyOutgoingTx(v.auth, big.NewInt(int64(id)), isVerified, signature)
+	if err != nil {
+		v.logger.Error("call VerifyOutgoingTx error", "err", err)
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.info.CallTimeout)*time.Second)
+	defer cancel()
+	receipt, err := bind.WaitMined(ctx, v.client, tx)
+	if err != nil {
+		v.logger.Error("call WaitMined error", "err", err)
+		return err
+	}
+	v.logger.Info("call WaitMined ok", "tx_hash", receipt.TxHash.Hex())
+	return nil
 }
 
 // VerifyIncomingInvoice implements Verifier.

@@ -1,11 +1,16 @@
 package operator
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
+	"github.com/aura-nw/lotus-operator/internal/operator/types"
+	"github.com/btcsuite/btcd/wire"
 	"log/slog"
+	"math/big"
 	"time"
 
-	"github.com/aura-nw/btc-bridge-core/clients/evm/contracts"
+	"github.com/aura-nw/lotus-core/clients/evm/contracts"
 	"github.com/aura-nw/lotus-operator/config"
 	"github.com/aura-nw/lotus-operator/internal/operator/bitcoin"
 	"github.com/aura-nw/lotus-operator/internal/operator/evm"
@@ -142,6 +147,83 @@ func (op *Operator) incomingEventsLoop() {
 
 func (op *Operator) outgoingEventsLoop() {
 	op.logger.Info("starting outgoing events loop")
+	ticker := time.NewTicker(time.Duration(op.config.Evm.QueryInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-op.ctx.Done():
+			op.logger.Info("outgoingEventsLoop: context done")
+			return
+		case <-ticker.C:
+			lastId, err := op.evmVerifier.GetOutgoingTxCount()
+			if err != nil {
+				op.logger.Error("outgoingEventsLoop: get last id failed", "err", err)
+				continue
+			}
+			if lastId == nil || lastId.Cmp(big.NewInt(0)) == 0 {
+				op.logger.Info("outgoingEventsLoop: no outgoing tx")
+				continue
+			}
+			op.logger.Info("outgoingEventsLoop", "last_id", lastId.Uint64())
+
+			// Process next id
+			txOutgoing, err := op.evmVerifier.GetOutgoingTx(lastId)
+			if err != nil {
+				op.logger.Error("outgoingEventsLoop: get outgoing invoice error", "err", err, "id", lastId.Uint64())
+				continue
+			}
+
+			op.logger.Info("outgoingEventsLoop: found invoice", "id", lastId)
+
+			if evm.InvoiceStatus(txOutgoing.Status) != evm.Pending {
+				op.logger.Info("outgoingEventsLoop: outgoing invoice no need verify", "id", lastId, "status", txOutgoing.Status)
+				continue
+			}
+
+			isValidate := true
+			outputs := make([]types.Utxo, 0)
+			for _, invoiceId := range txOutgoing.InvoiceIds {
+				invoice, err := op.evmVerifier.GetOutgoingInvoice(invoiceId.Uint64())
+				if err != nil {
+					op.logger.Error("outgoingEventsLoop: get outgoing invoice error", "err", err, "id", invoiceId)
+					isValidate = false
+					continue
+				}
+
+				if evm.InvoiceStatus(invoice.Status) != evm.Pending {
+					op.logger.Info("outgoingEventsLoop: outgoing invoice no need verify", "id", invoiceId, "status", invoice.Status)
+					continue
+				}
+
+				outputs = append(outputs, types.Utxo{
+					Address: invoice.Recipient,
+					Amount:  invoice.Amount.Int64(),
+				})
+			}
+			if !isValidate {
+				op.logger.Info("outgoingEventsLoop: outgoing invoice not validate", "id", lastId)
+				// submit verify failed to contract
+				if err := op.evmVerifier.VerifyOutgoingTx(lastId.Uint64(), false, ""); err != nil {
+					op.logger.Error("verify outgoing tx error", "err", err)
+					continue
+				}
+			}
+
+			// Verify and sign btc
+			signature, err := op.verifyAndSignBtc(txOutgoing.TxContent, outputs)
+			if err != nil {
+				op.logger.Error("outgoingEventsLoop: verify and sign btc error", "err", err)
+				continue
+			}
+
+			// submit verify success to contract
+			if err := op.evmVerifier.VerifyOutgoingTx(lastId.Uint64(), true, hex.EncodeToString(signature)); err != nil {
+				op.logger.Error("verify outgoing tx error", "err", err)
+				continue
+			}
+		}
+	}
 }
 
 func (op *Operator) Stop() {
@@ -164,4 +246,46 @@ func (op *Operator) indexOnIncommingInvoice(invoice contracts.IGatewayIncomingIn
 		}
 	}
 	return -1
+}
+
+func (op *Operator) verifyAndSignBtc(txContext string, outputs []types.Utxo) ([]byte, error) {
+	txBytes, err := hex.DecodeString(txContext)
+	if err != nil {
+		op.logger.Error("verifyAndSignBtc: decode tx context error", "err", err)
+		return nil, err
+	}
+
+	var msgTx wire.MsgTx
+	if err := msgTx.Deserialize(bytes.NewReader(txBytes)); err != nil {
+		op.logger.Error("verifyAndSignBtc: deserialize tx error", "err", err)
+		return nil, err
+	}
+
+	// Verify
+	allHasUtxo := 0
+	for _, output := range outputs {
+		for _, uxto := range msgTx.TxOut {
+			receiver, err := op.btcVerifier.ConvertToAddress(uxto.PkScript)
+			if err != nil {
+				op.logger.Error("verifyAndSignBtc: convert to address error", "err", err)
+				return nil, err
+			}
+			if output.Address == receiver && output.Amount == uxto.Value {
+				allHasUtxo++
+			}
+		}
+	}
+	if allHasUtxo != len(outputs) {
+		op.logger.Error("verifyAndSignBtc: not all outputs has utxo")
+		return nil, err
+	}
+
+	// Sign
+	signature, err := op.btcVerifier.Sign(&msgTx)
+	if err != nil {
+		op.logger.Error("verifyAndSignBtc: sign tx error", "err", err)
+		return nil, err
+	}
+
+	return signature, nil
 }
