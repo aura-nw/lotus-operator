@@ -1,7 +1,6 @@
 package bitcoin
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
@@ -55,7 +54,6 @@ func UtxoFromStr(s string) UtxoDef {
 }
 
 type verifierImpl struct {
-	ctx          context.Context
 	logger       *slog.Logger
 	info         config.BitcoinInfo
 	client       *rpcclient.Client
@@ -122,7 +120,7 @@ func (v *verifierImpl) VerifyTokenDeposit(utxo string) (bool, error) {
 	panic("unimplemented")
 }
 
-func NewVerifier(ctx context.Context, logger *slog.Logger, info config.BitcoinInfo) (Verifier, error) {
+func NewVerifier(logger *slog.Logger, info config.BitcoinInfo) (Verifier, error) {
 	connCfg := rpcclient.ConnConfig{
 		Host:         info.Host,
 		User:         info.User,
@@ -150,7 +148,6 @@ func NewVerifier(ctx context.Context, logger *slog.Logger, info config.BitcoinIn
 	}
 
 	return &verifierImpl{
-		ctx:          ctx,
 		logger:       logger,
 		client:       client,
 		info:         info,

@@ -4,7 +4,7 @@ go 1.21.7
 
 require (
 	github.com/BurntSushi/toml v1.3.2
-	github.com/aura-nw/lotus-core v0.0.0-20240402113351-33ae11651316
+	github.com/aura-nw/lotus-core v0.0.0-20240404100716-cb73e49b929f
 	github.com/btcsuite/btcd v0.24.0
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0
 	github.com/btcsuite/btcd/btcutil v1.1.5

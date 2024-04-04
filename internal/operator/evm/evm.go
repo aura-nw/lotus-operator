@@ -56,7 +56,6 @@ const (
 )
 
 type verifierImpl struct {
-	ctx             context.Context
 	logger          *slog.Logger
 	info            config.EvmInfo
 	client          *ethclient.Client
@@ -64,7 +63,7 @@ type verifierImpl struct {
 	gatewayContract *contracts.Gateway
 }
 
-func NewVerifier(ctx context.Context, logger *slog.Logger, info config.EvmInfo) (Verifier, error) {
+func NewVerifier(logger *slog.Logger, info config.EvmInfo) (Verifier, error) {
 	client, err := ethclient.Dial(info.Url)
 	if err != nil {
 		return nil, err
@@ -86,7 +85,6 @@ func NewVerifier(ctx context.Context, logger *slog.Logger, info config.EvmInfo) 
 	}
 
 	return &verifierImpl{
-		ctx:             ctx,
 		logger:          logger,
 		info:            info,
 		client:          client,
@@ -159,7 +157,7 @@ func (v *verifierImpl) VerifyOutgoingTx(id uint64, isVerified bool, signature st
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.info.CallTimeout)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(v.info.CallTimeout)*time.Second)
 	defer cancel()
 	receipt, err := bind.WaitMined(ctx, v.client, tx)
 	if err != nil {
@@ -172,13 +170,17 @@ func (v *verifierImpl) VerifyOutgoingTx(id uint64, isVerified bool, signature st
 
 // VerifyIncomingInvoice implements Verifier.
 func (v *verifierImpl) VerifyIncomingInvoice(id uint64, utxo string, amount *big.Int, recipient common.Address, isVerified bool) error {
+	if err := v.updateGasPrice(); err != nil {
+		return err
+	}
+
 	tx, err := v.gatewayContract.VerifyIncomingInvoice(v.auth, big.NewInt(int64(id)), utxo, amount, recipient, isVerified)
 	if err != nil {
 		v.logger.Error("call VerifyIncomingInvoice error", "err", err)
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.info.CallTimeout)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(v.info.CallTimeout)*time.Second)
 	defer cancel()
 	receipt, err := bind.WaitMined(ctx, v.client, tx)
 	if err != nil {
@@ -192,4 +194,18 @@ func (v *verifierImpl) VerifyIncomingInvoice(id uint64, utxo string, amount *big
 // VerifyOutgoingInvoice implements Verifier.
 func (v *verifierImpl) VerifyOutgoingInvoice(id uint64, amount *big.Int, recipient common.Address, signature string) error {
 	panic("unimplemented")
+}
+
+func (v *verifierImpl) updateGasPrice() error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(v.info.CallTimeout)*time.Second)
+	defer cancel()
+
+	gasPrice, err := v.client.SuggestGasPrice(ctx)
+	if err != nil {
+		v.logger.Error("suggest gas price error", "err", err)
+		return err
+	}
+	v.logger.Info("suggest gas price", "gas", gasPrice)
+	v.auth.GasPrice = gasPrice
+	return nil
 }

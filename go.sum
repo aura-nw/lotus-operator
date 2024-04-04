@@ -7,8 +7,8 @@ github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
-github.com/aura-nw/lotus-core v0.0.0-20240402113351-33ae11651316 h1:k3u8J+I+PZJkDFpACxWdCVS8MZkjOzjvo0kAG3lYTI4=
-github.com/aura-nw/lotus-core v0.0.0-20240402113351-33ae11651316/go.mod h1:GzQyrqkkOr02J4R+lztH1lzXLNOZSuukkijj+IaAVOE=
+github.com/aura-nw/lotus-core v0.0.0-20240404100716-cb73e49b929f h1:5SIhP22i9LJG3cIXoEeQWDRSNhcm/6gGMMYx5DBEruY=
+github.com/aura-nw/lotus-core v0.0.0-20240404100716-cb73e49b929f/go.mod h1:GzQyrqkkOr02J4R+lztH1lzXLNOZSuukkijj+IaAVOE=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.10.0 h1:ePXTeiPEazB5+opbv5fr8umg2R/1NlzgDsyepwsSr88=

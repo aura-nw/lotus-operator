@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/aura-nw/lotus-core/types"
 	"github.com/aura-nw/lotus-operator/config"
 	"github.com/aura-nw/lotus-operator/internal/operator/evm"
 	"github.com/ethereum/go-ethereum/common"
@@ -13,10 +14,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	evmosTestnetRpc           = "https://evmos-testnet-jsonrpc.alkadeta.com"
-	evmosTestnetChainId int64 = 9000
+const (
+	evmosTestnetRpc           = "https://jsonrpc.dev.aura.network"
+	evmosTestnetChainId int64 = 1235
 )
+
+var evmInfo config.EvmInfo = config.EvmInfo{
+	Url:              evmosTestnetRpc,
+	ChainID:          evmosTestnetChainId,
+	QueryInterval:    10,
+	MinConfirmations: 5,
+	PrivateKey:       "883d80012adf2272875981428715c56558eb388dcea4b48e030bd63ddd23c128",
+	Contracts: config.EvmContract{
+		WrappedBtcAddr: "0xC70b52bBFd514859FA01728FcE22DABb96cc130D",
+		GatewayAddr:    "0x4F80aD4F4F398465EaED7b5a6Cb5f2Fe256f7239",
+	},
+	CallTimeout: 10,
+}
 
 func TestRpc(t *testing.T) {
 	client, err := ethclient.Dial(evmosTestnetRpc)
@@ -32,18 +46,7 @@ func TestRpc(t *testing.T) {
 }
 
 func TestQueryGateway(t *testing.T) {
-	verifier, err := evm.NewVerifier(context.Background(), slog.Default(), config.EvmInfo{
-		Url:              evmosTestnetRpc,
-		ChainID:          evmosTestnetChainId,
-		QueryInterval:    10,
-		MinConfirmations: 5,
-		PrivateKey:       "883d80012adf2272875981428715c56558eb388dcea4b48e030bd63ddd23c128",
-		Contracts: config.EvmContract{
-			WrappedBtcAddr: "0x7fd84b9a10f13acD07B9fA95D217827dCf608140",
-			GatewayAddr:    "0x6731881DE07Ffce55968a583F5f641C589d25ea7",
-		},
-		CallTimeout: 10,
-	})
+	verifier, err := evm.NewVerifier(slog.Default(), evmInfo)
 	require.NoError(t, err)
 
 	require.Equal(t, common.HexToAddress("0xC32B94C38bbbfe65eCe90daF3493c7603dA2c19A"), verifier.GetAddress())
@@ -55,4 +58,25 @@ func TestQueryGateway(t *testing.T) {
 	nextIdIncoming, err := verifier.GetNextIdVerifyIncomingInvoice(verifier.GetAddress())
 	require.NoError(t, err)
 	t.Log("next id incoming: ", nextIdIncoming)
+}
+
+func TestVerify(t *testing.T) {
+	verifier, err := evm.NewVerifier(slog.Default(), evmInfo)
+	require.NoError(t, err)
+
+	testDeposit := types.BtcDeposit{
+		TxId:           "0b747b5c26bc02d03ab92d9ad8984539b978271941b88e781c772370b5aaf0e6",
+		Height:         2574433,
+		Memo:           "",
+		Receiver:       "0xD02c8cebc86Bd8Cc5fE876b4B793256C0d67a887",
+		Sender:         "",
+		MultisigWallet: "tb1qrvjce6589p2x9zupd8p0dnkq46s8lsh3rau7v5",
+		Amount:         602518,
+		Idx:            0,
+		UtxoStatus:     "unused",
+		Status:         "failed",
+	}
+
+	err = verifier.VerifyIncomingInvoice(1, testDeposit.TxId, big.NewInt(int64(testDeposit.Amount)), common.HexToAddress(testDeposit.Receiver), true)
+	require.NoError(t, err)
 }
