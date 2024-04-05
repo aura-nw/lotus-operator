@@ -25,6 +25,8 @@ type Operator struct {
 
 	evmVerifier evm.Verifier
 	btcVerifier bitcoin.Verifier
+
+	server *Server
 }
 
 func NewOperator(ctx context.Context, config *config.Config, logger *slog.Logger) (*Operator, error) {
@@ -36,14 +38,20 @@ func NewOperator(ctx context.Context, config *config.Config, logger *slog.Logger
 		logger: logger,
 	}
 
-	if err := op.init(); err != nil {
+	if err := op.initVerifier(); err != nil {
 		return nil, err
 	}
+
+	server, err := NewServer(ctx, op.logger, op.config.Server)
+	if err != nil {
+		return nil, err
+	}
+	op.server = server
 
 	return op, nil
 }
 
-func (op *Operator) init() error {
+func (op *Operator) initVerifier() error {
 	// Init evm verifier
 	evmVerifier, err := evm.NewVerifier(op.logger, op.config.Evm)
 	if err != nil {
@@ -67,6 +75,9 @@ func (op *Operator) Start() {
 	op.logger.Info("starting operator service", "evm address", op.evmVerifier.GetAddress().Hex())
 	go op.incomingEventsLoop()
 	go op.outgoingEventsLoop()
+
+	op.logger.Info("starting operator server", "port", op.config.Server.HttpPort)
+	go op.server.Start()
 }
 
 func (op *Operator) incomingEventsLoop() {
@@ -231,6 +242,7 @@ func (op *Operator) outgoingEventsLoop() {
 func (op *Operator) Stop() {
 	op.logger.Info("stopping operator service")
 	op.cancel()
+	op.server.Stop()
 }
 
 func (op *Operator) isVerified(invoice contracts.IGatewayIncomingInvoiceResponse) bool {

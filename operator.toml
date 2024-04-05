@@ -1,6 +1,6 @@
 # Server configuration
 [server]
-grpc-port = "5055"
+http-port = "5055"
 
 # Bitcoin configuration
 [bitcoin]

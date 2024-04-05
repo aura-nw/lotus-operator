@@ -13,7 +13,7 @@ type Config struct {
 }
 
 type ServerInfo struct {
-	GrpcPort string `toml:"grpc-port"`
+	HttpPort string `toml:"http-port"`
 }
 
 type BitcoinInfo struct {
