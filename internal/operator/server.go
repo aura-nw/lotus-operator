@@ -36,14 +36,20 @@ func NewServer(ctx context.Context, logger *slog.Logger, info config.ServerInfo)
 
 func (s *Server) registerHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`OK`))
+		if _, err := w.Write([]byte(`OK`)); err != nil {
+			s.logger.Error("write data to client error", "err", err)
+		}
 	})
 }
 
 func (s *Server) Start() {
-	s.srv.ListenAndServe()
+	if err := s.srv.ListenAndServe(); err != nil {
+		panic(err)
+	}
 }
 
 func (s *Server) Stop() {
-	s.srv.Shutdown(s.ctx)
+	if err := s.srv.Shutdown(s.ctx); err != nil {
+		s.logger.Error("shutdown http server error", "err", err)
+	}
 }

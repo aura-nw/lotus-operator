@@ -122,13 +122,11 @@ func (op *Operator) incomingEventsLoop() {
 
 			if evm.InvoiceStatus(invoice.Status) != evm.Pending {
 				op.logger.Info("incomingEventsLoop: incoming invoice no need verify", "id", id, "status", invoice.Status)
-				id++
 				continue
 			}
 
 			if op.isVerified(invoice) {
 				op.logger.Info("incomingEventsLoop: invoice has self-verified", "address", op.evmVerifier.GetAddress().Hex())
-				id++
 				continue
 			}
 
@@ -145,7 +143,6 @@ func (op *Operator) incomingEventsLoop() {
 					op.logger.Error("verify incomming invoice error", "err", err)
 					continue
 				}
-				id++
 				continue
 			}
 			// Vote yes and wait
@@ -154,7 +151,6 @@ func (op *Operator) incomingEventsLoop() {
 				op.logger.Error("verify incomming invoice error", "err", err)
 				continue
 			}
-			id++
 		}
 
 	}
