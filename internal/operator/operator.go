@@ -82,12 +82,6 @@ func (op *Operator) Start() {
 
 func (op *Operator) incomingEventsLoop() {
 	op.logger.Info("starting incoming events loop")
-	nextId, err := op.evmVerifier.GetNextIdVerifyIncomingInvoice(op.evmVerifier.GetAddress())
-	if err != nil {
-		op.logger.Error("incomingEventsLoop: get next id error", "err", err)
-		return
-	}
-	op.logger.Info("incomingEventsLoop", "next_id", nextId.Uint64(), "query_interval", op.config.Evm.QueryInterval)
 
 	ticker := time.NewTicker(time.Duration(op.config.Evm.QueryInterval) * time.Second)
 	defer ticker.Stop()
@@ -103,8 +97,16 @@ func (op *Operator) incomingEventsLoop() {
 				op.logger.Error("incomingEventsLoop: get incoming invoice count error", "err", err)
 				continue
 			}
-			id := nextId.Uint64()
 			count := c.Uint64()
+
+			nextId, err := op.evmVerifier.GetNextIdVerifyIncomingInvoice(op.evmVerifier.GetAddress())
+			if err != nil {
+				op.logger.Error("incomingEventsLoop: get next id error", "err", err)
+				return
+			}
+			op.logger.Info("incomingEventsLoop", "next_id", nextId.Uint64(), "query_interval", op.config.Evm.QueryInterval)
+
+			id := nextId.Uint64()
 			if id > count {
 				op.logger.Info("incomingEventsLoop: waiting for next incoming id", "next_id", id, "count", count)
 				continue

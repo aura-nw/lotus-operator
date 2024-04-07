@@ -77,6 +77,7 @@ func (v *verifierImpl) VerifyBtcDeposit(utxo string, amount uint64, recipient st
 
 	tx, err := v.client.GetRawTransactionVerbose(txHash)
 	if err != nil {
+		v.logger.Error("get raw transaction verbose error", "err", err, "tx_hash", txHash)
 		return false, err
 	}
 

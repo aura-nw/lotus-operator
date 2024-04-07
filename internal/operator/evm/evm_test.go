@@ -19,17 +19,20 @@ const (
 	evmosTestnetChainId int64 = 1235
 )
 
-var evmInfo config.EvmInfo = config.EvmInfo{
-	Url:              evmosTestnetRpc,
-	ChainID:          evmosTestnetChainId,
-	QueryInterval:    10,
-	MinConfirmations: 5,
-	PrivateKey:       "883d80012adf2272875981428715c56558eb388dcea4b48e030bd63ddd23c128",
-	Contracts: config.EvmContract{
-		WrappedBtcAddr: "0xC70b52bBFd514859FA01728FcE22DABb96cc130D",
-		GatewayAddr:    "0x4F80aD4F4F398465EaED7b5a6Cb5f2Fe256f7239",
-	},
-	CallTimeout: 10,
+func getEvmInfo(privateKey string) config.EvmInfo {
+	return config.EvmInfo{
+		Url:              evmosTestnetRpc,
+		ChainID:          evmosTestnetChainId,
+		QueryInterval:    10,
+		MinConfirmations: 5,
+		// PrivateKey:       "883d80012adf2272875981428715c56558eb388dcea4b48e030bd63ddd23c128",
+		PrivateKey: privateKey,
+		Contracts: config.EvmContract{
+			WrappedBtcAddr: "0xC70b52bBFd514859FA01728FcE22DABb96cc130D",
+			GatewayAddr:    "0x4F80aD4F4F398465EaED7b5a6Cb5f2Fe256f7239",
+		},
+		CallTimeout: 10,
+	}
 }
 
 func TestRpc(t *testing.T) {
@@ -46,7 +49,8 @@ func TestRpc(t *testing.T) {
 }
 
 func TestQueryGateway(t *testing.T) {
-	verifier, err := evm.NewVerifier(slog.Default(), evmInfo)
+	priv1 := "883d80012adf2272875981428715c56558eb388dcea4b48e030bd63ddd23c128"
+	verifier, err := evm.NewVerifier(slog.Default(), getEvmInfo(priv1))
 	require.NoError(t, err)
 
 	require.Equal(t, common.HexToAddress("0xC32B94C38bbbfe65eCe90daF3493c7603dA2c19A"), verifier.GetAddress())
@@ -61,11 +65,18 @@ func TestQueryGateway(t *testing.T) {
 }
 
 func TestVerify(t *testing.T) {
-	verifier, err := evm.NewVerifier(slog.Default(), evmInfo)
+	priv1 := "444a26796811d3b86bd1c3b85d04b9b078e4eee66203096f04081b245d6e4123"
+	verifier, err := evm.NewVerifier(slog.Default(), getEvmInfo(priv1))
 	require.NoError(t, err)
 
+	t.Log("sender address: ", verifier.GetAddress().Hex())
+
+	operators, err := verifier.GetOperators()
+	require.NoError(t, err)
+	t.Log("list operators: ", operators)
+
 	testDeposit := types.BtcDeposit{
-		TxId:           "0b747b5c26bc02d03ab92d9ad8984539b978271941b88e781c772370b5aaf0e6",
+		TxId:           "12747b5c26bc02d03ab92d9ad8984539b978271941b88e781c772370b5aaf0e123",
 		Height:         2574433,
 		Memo:           "",
 		Receiver:       "0xD02c8cebc86Bd8Cc5fE876b4B793256C0d67a887",
@@ -74,9 +85,13 @@ func TestVerify(t *testing.T) {
 		Amount:         602518,
 		Idx:            0,
 		UtxoStatus:     "unused",
-		Status:         "failed",
+		Status:         "new",
 	}
 
-	err = verifier.VerifyIncomingInvoice(1, testDeposit.TxId, big.NewInt(int64(testDeposit.Amount)), common.HexToAddress(testDeposit.Receiver), true)
+	count, err := verifier.GetIncomingInvoiceCount()
+	require.NoError(t, err)
+	t.Log("count incoming: ", count)
+
+	err = verifier.VerifyIncomingInvoice(count.Uint64(), testDeposit.TxId, big.NewInt(int64(testDeposit.Amount)), common.HexToAddress(testDeposit.Receiver), true)
 	require.NoError(t, err)
 }

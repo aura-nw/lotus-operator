@@ -22,6 +22,7 @@ type Verifier interface {
 
 type Sender interface {
 	GetAddress() common.Address
+	GetOperators() ([]common.Address, error)
 
 	VerifyIncomingInvoice(id uint64, utxo string, amount *big.Int, recipient common.Address, isVerified bool) error
 
@@ -206,6 +207,20 @@ func (v *verifierImpl) updateGasPrice() error {
 		return err
 	}
 	v.logger.Info("suggest gas price", "gas", gasPrice)
-	v.auth.GasPrice = gasPrice
+	v.auth.GasPrice = big.NewInt(gasPrice.Int64() * 2)
 	return nil
+}
+
+// GetOperators implements Verifier.
+func (v *verifierImpl) GetOperators() ([]common.Address, error) {
+	operatorInfos, err := v.gatewayContract.AllValidators(&bind.CallOpts{})
+	if err != nil {
+		v.logger.Error("get all operators error", "err", err)
+		return nil, err
+	}
+	var addrs []common.Address
+	for _, info := range operatorInfos {
+		addrs = append(addrs, info.Validator)
+	}
+	return addrs, nil
 }
