@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"math/big"
 	"time"
@@ -72,12 +73,51 @@ func (op *Operator) initVerifier() error {
 }
 
 func (op *Operator) Start() {
-	op.logger.Info("starting operator service", "evm address", op.evmVerifier.GetAddress().Hex())
+	op.logger.Info("starting operator service", "evm_address", op.evmVerifier.GetAddress().Hex())
 	go op.incomingEventsLoop()
 	go op.outgoingEventsLoop()
 
 	op.logger.Info("starting operator server", "port", op.config.Server.HttpPort)
 	go op.server.Start()
+}
+
+func (op *Operator) findNextIncomingIdNeedVerify() (uint64, error) {
+	address := op.evmVerifier.GetAddress()
+	nextId, err := op.evmVerifier.GetNextIdVerifyIncomingInvoice(address)
+	if err != nil {
+		op.logger.Error("get next id verify incomint invoice error", "err", err)
+		return 0, err
+	}
+	id := nextId.Uint64()
+	for {
+		count, err := op.evmVerifier.GetIncomingInvoiceCount()
+		if err != nil {
+			op.logger.Error("get incoming invoice count error", "err", err)
+			return 0, err
+		}
+		if id > count.Uint64() {
+			op.logger.Info("no incoming invoice need verify")
+			return 0, fmt.Errorf("no incoming invoice need verify")
+		}
+		invoice, err := op.evmVerifier.GetIncomingInvoice(id)
+		if err != nil {
+			op.logger.Error("get incoming invoice error", "err", err, "id", id, "err", err)
+			return 0, err
+		}
+		if evm.InvoiceStatus(invoice.Status) != evm.Pending {
+			op.logger.Info("incoming invoice no need verify", "id", id, "status", invoice.Status)
+			id++
+			continue
+		}
+
+		if op.isVerified(invoice) {
+			op.logger.Info("invoice has self-verified", "address", address.Hex())
+			id++
+			continue
+		}
+		return id, nil
+	}
+
 }
 
 func (op *Operator) incomingEventsLoop() {
@@ -89,70 +129,57 @@ func (op *Operator) incomingEventsLoop() {
 	for {
 		select {
 		case <-op.ctx.Done():
-			op.logger.Info("incomingEventsLoop: context done")
+			op.logger.Info("context done")
 			return
 		case <-ticker.C:
-			c, err := op.evmVerifier.GetIncomingInvoiceCount()
+			nextId, err := op.findNextIncomingIdNeedVerify()
 			if err != nil {
-				op.logger.Error("incomingEventsLoop: get incoming invoice count error", "err", err)
+				op.logger.Error("find next incoming invoice id error", "err", err)
+				time.Sleep(1 * time.Second)
 				continue
 			}
-			count := c.Uint64()
+			op.logger.Info("next incoming id for verify", "id", nextId)
 
-			nextId, err := op.evmVerifier.GetNextIdVerifyIncomingInvoice(op.evmVerifier.GetAddress())
-			if err != nil {
-				op.logger.Error("incomingEventsLoop: get next id error", "err", err)
-				return
-			}
-			op.logger.Info("incomingEventsLoop", "next_id", nextId.Uint64(), "query_interval", op.config.Evm.QueryInterval)
-
-			id := nextId.Uint64()
-			if id > count {
-				op.logger.Info("incomingEventsLoop: waiting for next incoming id", "next_id", id, "count", count)
-				continue
-			}
 			// Process next id
-			invoice, err := op.evmVerifier.GetIncomingInvoice(id)
+			invoice, err := op.evmVerifier.GetIncomingInvoice(nextId)
 			if err != nil {
-				op.logger.Error("incomingEventsLoop: get incoming invoice error", "err", err, "id", id, "err", err)
+				op.logger.Error("get incoming invoice error", "err", err, "id", nextId, "err", err)
 				continue
 			}
-
-			op.logger.Info("incomingEventsLoop: found invoice", "id", id)
-
-			if evm.InvoiceStatus(invoice.Status) != evm.Pending {
-				op.logger.Info("incomingEventsLoop: incoming invoice no need verify", "id", id, "status", invoice.Status)
-				continue
-			}
-
-			if op.isVerified(invoice) {
-				op.logger.Info("incomingEventsLoop: invoice has self-verified", "address", op.evmVerifier.GetAddress().Hex())
-				continue
-			}
+			op.logger.Info("found incoming invoice", "id", nextId)
 
 			// Verify invoice
 			valid, err := op.btcVerifier.VerifyBtcDeposit(invoice.Utxo, invoice.Amount.Uint64(), invoice.Recipient.Hex())
 			if err != nil {
-				op.logger.Error("incomingEventsLoop: verify btc deposit failed", "err", err)
+				op.logger.Error("verify btc deposit failed", "err", err)
 				continue
 			}
 			if !valid {
-				op.logger.Info("incomingEventsLoop: btc deposit not vaild", "id", invoice.InvoiceId)
+				op.logger.Info("btc deposit not vaild", "id", invoice.InvoiceId)
 				// Vote no and wait
-				if err := op.evmVerifier.VerifyIncomingInvoice(invoice.InvoiceId.Uint64(), invoice.Utxo, invoice.Amount, invoice.Recipient, false); err != nil {
+				if err := op.evmVerifier.VerifyIncomingInvoice(
+					invoice.InvoiceId.Uint64(),
+					invoice.Utxo,
+					invoice.Amount,
+					invoice.Recipient,
+					false,
+				); err != nil {
 					op.logger.Error("verify incomming invoice error", "err", err)
 					continue
 				}
 				continue
 			}
 			// Vote yes and wait
-			op.logger.Info("incomingEventsLoop: btc deposit vaild", "id", invoice.InvoiceId)
-			if err := op.evmVerifier.VerifyIncomingInvoice(invoice.InvoiceId.Uint64(), invoice.Utxo, invoice.Amount, invoice.Recipient, true); err != nil {
+			op.logger.Info("btc deposit vaild", "id", invoice.InvoiceId)
+			if err := op.evmVerifier.VerifyIncomingInvoice(
+				invoice.InvoiceId.Uint64(),
+				invoice.Utxo, invoice.Amount,
+				invoice.Recipient, true,
+			); err != nil {
 				op.logger.Error("verify incomming invoice error", "err", err)
 				continue
 			}
 		}
-
 	}
 }
 
@@ -164,16 +191,16 @@ func (op *Operator) outgoingEventsLoop() {
 	for {
 		select {
 		case <-op.ctx.Done():
-			op.logger.Info("outgoingEventsLoop: context done")
+			op.logger.Info("context done")
 			return
 		case <-ticker.C:
 			lastId, err := op.evmVerifier.GetOutgoingTxCount()
 			if err != nil {
-				op.logger.Error("outgoingEventsLoop: get last id failed", "err", err)
+				op.logger.Error("get last id failed", "err", err)
 				continue
 			}
 			if lastId == nil || lastId.Cmp(big.NewInt(0)) == 0 {
-				op.logger.Info("outgoingEventsLoop: no outgoing tx")
+				op.logger.Info("no outgoing tx")
 				continue
 			}
 			op.logger.Info("outgoingEventsLoop", "last_id", lastId.Uint64())
@@ -181,14 +208,14 @@ func (op *Operator) outgoingEventsLoop() {
 			// Process next id
 			txOutgoing, err := op.evmVerifier.GetOutgoingTx(lastId)
 			if err != nil {
-				op.logger.Error("outgoingEventsLoop: get outgoing invoice error", "err", err, "id", lastId.Uint64())
+				op.logger.Error("get outgoing invoice error", "err", err, "id", lastId.Uint64())
 				continue
 			}
 
-			op.logger.Info("outgoingEventsLoop: found invoice", "id", lastId)
+			op.logger.Info("found invoice", "id", lastId)
 
 			if evm.InvoiceStatus(txOutgoing.Status) != evm.Pending {
-				op.logger.Info("outgoingEventsLoop: outgoing invoice no need verify", "id", lastId, "status", txOutgoing.Status)
+				op.logger.Info("outgoing invoice no need verify", "id", lastId, "status", txOutgoing.Status)
 				continue
 			}
 
@@ -197,13 +224,13 @@ func (op *Operator) outgoingEventsLoop() {
 			for _, invoiceId := range txOutgoing.InvoiceIds {
 				invoice, err := op.evmVerifier.GetOutgoingInvoice(invoiceId.Uint64())
 				if err != nil {
-					op.logger.Error("outgoingEventsLoop: get outgoing invoice error", "err", err, "id", invoiceId)
+					op.logger.Error("get outgoing invoice error", "err", err, "id", invoiceId)
 					isValidate = false
 					continue
 				}
 
 				if evm.InvoiceStatus(invoice.Status) != evm.Pending {
-					op.logger.Info("outgoingEventsLoop: outgoing invoice no need verify", "id", invoiceId, "status", invoice.Status)
+					op.logger.Info("outgoing invoice no need verify", "id", invoiceId, "status", invoice.Status)
 					continue
 				}
 
@@ -213,7 +240,7 @@ func (op *Operator) outgoingEventsLoop() {
 				})
 			}
 			if !isValidate {
-				op.logger.Info("outgoingEventsLoop: outgoing invoice not validate", "id", lastId)
+				op.logger.Info("outgoing invoice not validate", "id", lastId)
 				// submit verify failed to contract
 				if err := op.evmVerifier.VerifyOutgoingTx(lastId.Uint64(), false, ""); err != nil {
 					op.logger.Error("verify outgoing tx error", "err", err)
@@ -224,7 +251,7 @@ func (op *Operator) outgoingEventsLoop() {
 			// Verify and sign btc
 			signature, err := op.verifyAndSignBtc(txOutgoing.TxContent, outputs)
 			if err != nil {
-				op.logger.Error("outgoingEventsLoop: verify and sign btc error", "err", err)
+				op.logger.Error("verify and sign btc error", "err", err)
 				continue
 			}
 
@@ -263,13 +290,13 @@ func (op *Operator) indexOnIncommingInvoice(invoice contracts.IGatewayIncomingIn
 func (op *Operator) verifyAndSignBtc(txContext string, outputs []types.Utxo) ([]byte, error) {
 	txBytes, err := hex.DecodeString(txContext)
 	if err != nil {
-		op.logger.Error("verifyAndSignBtc: decode tx context error", "err", err)
+		op.logger.Error("decode tx context error", "err", err)
 		return nil, err
 	}
 
 	var msgTx wire.MsgTx
 	if err := msgTx.Deserialize(bytes.NewReader(txBytes)); err != nil {
-		op.logger.Error("verifyAndSignBtc: deserialize tx error", "err", err)
+		op.logger.Error("deserialize tx error", "err", err)
 		return nil, err
 	}
 
@@ -279,7 +306,7 @@ func (op *Operator) verifyAndSignBtc(txContext string, outputs []types.Utxo) ([]
 		for _, uxto := range msgTx.TxOut {
 			receiver, err := op.btcVerifier.ConvertToAddress(uxto.PkScript)
 			if err != nil {
-				op.logger.Error("verifyAndSignBtc: convert to address error", "err", err)
+				op.logger.Error("convert to address error", "err", err)
 				return nil, err
 			}
 			if output.Address == receiver && output.Amount == uxto.Value {
@@ -288,14 +315,14 @@ func (op *Operator) verifyAndSignBtc(txContext string, outputs []types.Utxo) ([]
 		}
 	}
 	if allHasUtxo != len(outputs) {
-		op.logger.Error("verifyAndSignBtc: not all outputs has utxo")
+		op.logger.Error("not all outputs has utxo")
 		return nil, err
 	}
 
 	// Sign
 	signature, err := op.btcVerifier.Sign(&msgTx)
 	if err != nil {
-		op.logger.Error("verifyAndSignBtc: sign tx error", "err", err)
+		op.logger.Error("sign tx error", "err", err)
 		return nil, err
 	}
 
